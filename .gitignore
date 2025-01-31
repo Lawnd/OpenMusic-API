@@ -1,0 +1,16 @@
+# Node.js
+node_modules/
+
+# Ditambahkan oleh editor code (misal, VS Code)
+.vscode/
+
+# Cache
+npm-cache/
+yarn-cache/
+
+# Log
+logs/
+
+# ENV
+.env
+.prod.env
