@@ -1,9 +1,8 @@
-// ENV
-require('dotenv').config();
-
-// HAPI AND JWT
+// HAPI, JWT, CONFIG
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
+const Inert = require('@hapi/inert');
+const config = require('./utils/config.js');
 
 // EXCEPTIONS
 const ClientError = require('./exceptions/ClientError');
@@ -44,18 +43,32 @@ const collaborations = require('./api/collaborations');
 const CollaborationsService = require('./services/postgres/CollaborationsService');
 const CollaborationsValidator = require('./validator/collaborations');
 
+// EXPORTS
+const _exports = require('./api/exports');
+const ProducerService = require('./services/rabbitmq/ProducerService');
+const ExportsValidator = require('./validator/exports');
+
+// STORAGE
+const StorageService = require('./services/S3/StorageService');
+const UploadsValidator = require('./validator/uploads');
+
+// CACHE
+const CacheService = require('./services/redis/CacheService');
+
 const init = async () => {
-  const albumsService = new AlbumsService();
+  const cacheService = new CacheService();
+  const albumsService = new AlbumsService(cacheService);
   const songsService = new SongsService();
   const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
   const playlistsService = new PlaylistsService();
   const activitiesService = new ActivitiesService();
   const collaborationsService = new CollaborationsService(usersService);
+  const storageService = new StorageService();
 
   const server = Hapi.server({
-    port: process.env.PORT,
-    host: process.env.HOST,
+    port: config.app.port,
+    host: config.app.host,
     routes: {
       cors: {
         origin: ['*'],
@@ -68,16 +81,19 @@ const init = async () => {
     {
       plugin: Jwt,
     },
+    {
+      plugin: Inert,
+    },
   ]);
 
   // AUTH STRATEGY
-  server.auth.strategy('playlists_jwt', 'jwt', {
-    keys: process.env.ACCESS_TOKEN_KEY,
+  server.auth.strategy('openmusic_jwt', 'jwt', {
+    keys: config.jwt.accessTokenKey,
     verify: {
       aud: false,
       iss: false,
       sub: false,
-      maxAgeSec: process.env.ACCESS_TOKEN_AGE,
+      maxAgeSec: config.jwt.accessTokenAge,
     },
     validate: (artifacts) => ({
       isValid: true,
@@ -92,7 +108,9 @@ const init = async () => {
       plugin: albums,
       options: {
         service: albumsService,
+        storageService,
         validator: AlbumsValidator,
+        imagesValidator: UploadsValidator,
       },
     },
     {
@@ -140,6 +158,14 @@ const init = async () => {
         playlistsService,
         activitiesService,
         validator: ActivitiesValidator,
+      },
+    },
+    {
+      plugin: _exports,
+      options: {
+        producerService: ProducerService,
+        playlistsService,
+        validator: ExportsValidator,
       },
     },
   ]);

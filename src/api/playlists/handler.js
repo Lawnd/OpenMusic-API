@@ -82,13 +82,10 @@ class PlaylistsHandler {
     const { id: playlistId } = request.params;
     const { id: credentialId } = request.auth.credentials;
 
-    // Verifikasi akses ke playlist (owner atau kolaborator)
     await this._playlistsService.verifyPlaylistAccess(playlistId, credentialId);
 
-    // Ambil detail playlist
     const playlist = await this._playlistsService.getPlaylistById(playlistId);
 
-    // Ambil daftar lagu dari playlist
     const songs = await this._playlistsService.getSongsFromPlaylist(playlistId);
 
     return {
